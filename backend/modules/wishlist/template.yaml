@@ -1,0 +1,126 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Wishlist Module for Collaborative Wishlist App
+
+Parameters:
+    TableName:
+        Type: String
+        Description: Name of the DynamoDB table
+    AllowedOrigin:
+        Type: String
+        Description: Allowed origin for CORS
+
+Globals:
+    Function:
+        Timeout: 10
+        Runtime: nodejs22.x
+        Architectures:
+            - x86_64
+        Environment:
+            Variables:
+                TABLE_NAME: !Ref TableName
+                ALLOWED_ORIGIN: !Ref AllowedOrigin
+                JWT_SECRET: your-secret-key
+
+Resources:
+    CreateWishlistFunction:
+        Type: AWS::Serverless::Function
+        Properties:
+            Handler: create-wishlist/app.handler
+            CodeUri: ../../
+            Policies:
+                - DynamoDBCrudPolicy:
+                      TableName: !Ref TableName
+        Metadata:
+            BuildMethod: esbuild
+            BuildProperties:
+                Minify: true
+                Target: es2022
+                Sourcemap: false
+                EntryPoints:
+                    - modules/wishlist/create-wishlist/app.ts
+                External:
+                    - '@aws-sdk/client-dynamodb'
+                    - '@aws-sdk/lib-dynamodb'
+
+    GetWishlistsFunction:
+        Type: AWS::Serverless::Function
+        Properties:
+            Handler: get-wishlists/app.handler
+            CodeUri: ../../
+            Policies:
+                - DynamoDBCrudPolicy:
+                      TableName: !Ref TableName
+        Metadata:
+            BuildMethod: esbuild
+            BuildProperties:
+                Minify: true
+                Target: es2022
+                Sourcemap: false
+                EntryPoints:
+                    - modules/wishlist/get-wishlists/app.ts
+                External:
+                    - '@aws-sdk/client-dynamodb'
+                    - '@aws-sdk/lib-dynamodb'
+
+    ManageWishlistFunction:
+        Type: AWS::Serverless::Function
+        Properties:
+            Handler: manage-wishlist/app.handler
+            CodeUri: ../../
+            Policies:
+                - DynamoDBCrudPolicy:
+                      TableName: !Ref TableName
+        Metadata:
+            BuildMethod: esbuild
+            BuildProperties:
+                Minify: true
+                Target: es2022
+                Sourcemap: false
+                EntryPoints:
+                    - modules/wishlist/manage-wishlist/app.ts
+                External:
+                    - '@aws-sdk/client-dynamodb'
+                    - '@aws-sdk/lib-dynamodb'
+
+    InviteWishlistFunction:
+        Type: AWS::Serverless::Function
+        Properties:
+            Handler: invite-wishlist/app.handler
+            CodeUri: ../../
+            Policies:
+                - DynamoDBCrudPolicy:
+                      TableName: !Ref TableName
+        Metadata:
+            BuildMethod: esbuild
+            BuildProperties:
+                Minify: true
+                Target: es2022
+                Sourcemap: false
+                EntryPoints:
+                    - modules/wishlist/invite-wishlist/app.ts
+                External:
+                    - '@aws-sdk/client-dynamodb'
+                    - '@aws-sdk/lib-dynamodb'
+
+Outputs:
+    CreateWishlistFunctionArn:
+        Description: ARN of the CreateWishlist Lambda Function
+        Value: !GetAtt CreateWishlistFunction.Arn
+        Export:
+            Name: !Sub '${AWS::StackName}-CreateWishlistFunctionArn'
+    GetWishlistsFunctionArn:
+        Description: ARN of the GetWishlists Lambda Function
+        Value: !GetAtt GetWishlistsFunction.Arn
+        Export:
+            Name: !Sub '${AWS::StackName}-GetWishlistsFunctionArn'
+    ManageWishlistFunctionArn:
+        Description: ARN of the ManageWishlist Lambda Function
+        Value: !GetAtt ManageWishlistFunction.Arn
+        Export:
+            Name: !Sub '${AWS::StackName}-ManageWishlistFunctionArn'
+    InviteWishlistFunctionArn:
+        Description: ARN of the InviteWishlist Lambda Function
+        Value: !GetAtt InviteWishlistFunction.Arn
+        Export:
+            Name: !Sub '${AWS::StackName}-InviteWishlistFunctionArn'

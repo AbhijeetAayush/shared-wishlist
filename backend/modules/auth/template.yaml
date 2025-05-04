@@ -1,0 +1,51 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Authentication Module for Collaborative Wishlist App
+
+Parameters:
+    TableName:
+        Type: String
+        Description: Name of the DynamoDB table
+    AllowedOrigin:
+        Type: String
+        Description: Allowed origin for CORS
+
+Globals:
+    Function:
+        Timeout: 10
+        Runtime: nodejs22.x
+        Architectures:
+            - x86_64
+        Environment:
+            Variables:
+                TABLE_NAME: !Ref TableName
+                ALLOWED_ORIGIN: !Ref AllowedOrigin
+                JWT_SECRET: your-secret-key
+
+Resources:
+    CreateAuthFunction:
+        Type: AWS::Serverless::Function
+        Properties:
+            Handler: create-auth/app.handler
+            CodeUri: ../../
+            Policies:
+                - DynamoDBCrudPolicy:
+                      TableName: !Ref TableName
+        Metadata:
+            BuildMethod: esbuild
+            BuildProperties:
+                Minify: true
+                Target: es2022
+                Sourcemap: false
+                EntryPoints:
+                    - modules/auth/create-auth/app.ts
+                External:
+                    - '@aws-sdk/client-dynamodb'
+                    - '@aws-sdk/lib-dynamodb'
+
+Outputs:
+    CreateAuthFunctionArn:
+        Description: ARN of the CreateAuth Lambda Function
+        Value: !GetAtt CreateAuthFunction.Arn
+        Export:
+            Name: !Sub '${AWS::StackName}-CreateAuthFunctionArn'

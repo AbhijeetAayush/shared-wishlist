@@ -1,0 +1,189 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Collaborative Product Wishlist App Backend with Nested Stacks
+
+Parameters:
+    TableName:
+        Type: String
+        Default: WishlistAppTable
+        Description: Name of the DynamoDB table
+    AllowedOrigin:
+        Type: String
+        Default: '*'
+        Description: Allowed origin for CORS
+
+Resources:
+    # DynamoDB Table with Single-Table Design and GSI
+    WishlistAppTable:
+        Type: AWS::DynamoDB::Table
+        DeletionPolicy: Retain
+        Properties:
+            TableName: !Ref TableName
+            BillingMode: PAY_PER_REQUEST
+            AttributeDefinitions:
+                - AttributeName: PK
+                  AttributeType: S
+                - AttributeName: SK
+                  AttributeType: S
+                - AttributeName: GSI1PK
+                  AttributeType: S
+                - AttributeName: GSI1SK
+                  AttributeType: S
+            KeySchema:
+                - AttributeName: PK
+                  KeyType: HASH
+                - AttributeName: SK
+                  KeyType: RANGE
+            GlobalSecondaryIndexes:
+                - IndexName: GSI1
+                  KeySchema:
+                      - AttributeName: GSI1PK
+                        KeyType: HASH
+                      - AttributeName: GSI1SK
+                        KeyType: RANGE
+                  Projection:
+                      ProjectionType: ALL
+            StreamSpecification:
+                StreamViewType: NEW_AND_OLD_IMAGES
+
+    # API Gateway Role
+    RestApiRole:
+        Type: AWS::IAM::Role
+        Properties:
+            AssumeRolePolicyDocument:
+                Version: '2012-10-17'
+                Statement:
+                    - Effect: Allow
+                      Principal:
+                          Service: apigateway.amazonaws.com
+                      Action: sts:AssumeRole
+            Policies:
+                - PolicyName: InvokeLambdaPolicy
+                  PolicyDocument:
+                      Version: '2012-10-17'
+                      Statement:
+                          - Effect: Allow
+                            Action:
+                                - lambda:InvokeFunction
+                            Resource:
+                                - !GetAtt AuthModuleResources.Outputs.CreateAuthFunctionArn
+                                - !GetAtt WishlistModuleResources.Outputs.CreateWishlistFunctionArn
+                                - !GetAtt WishlistModuleResources.Outputs.GetWishlistsFunctionArn
+                                - !GetAtt WishlistModuleResources.Outputs.ManageWishlistFunctionArn
+                                - !GetAtt WishlistModuleResources.Outputs.InviteWishlistFunctionArn
+                                - !GetAtt ProductsModuleResources.Outputs.ManageProductsFunctionArn
+                                - !GetAtt WebSocketModuleResources.Outputs.ConnectFunctionArn
+                                - !GetAtt WebSocketModuleResources.Outputs.DisconnectFunctionArn
+                                - !GetAtt WebSocketModuleResources.Outputs.SubscribeFunctionArn
+                                - !GetAtt WebSocketModuleResources.Outputs.StreamFunctionArn
+
+    # API Gateway for REST APIs
+    WishlistApi:
+        Type: AWS::Serverless::Api
+        Properties:
+            StageName: Prod
+            DefinitionBody:
+                'Fn::Transform':
+                    Name: AWS::Include
+                    Parameters:
+                        Location: ./api/backend-api.yaml
+            Cors:
+                AllowMethods: "'GET,POST,PUT,DELETE,OPTIONS'"
+                AllowHeaders: "'Content-Type,Authorization'"
+                AllowOrigin: !Ref AllowedOrigin
+
+    # WebSocket API
+    WebSocketApi:
+        Type: AWS::ApiGatewayV2::Api
+        Properties:
+            Name: !Sub '${AWS::StackName}-WebSocketApi'
+            ProtocolType: WEBSOCKET
+            RouteSelectionExpression: $request.body.action
+
+    # WebSocket Stage
+    WebSocketStage:
+        Type: AWS::ApiGatewayV2::Stage
+        Properties:
+            ApiId: !Ref WebSocketApi
+            StageName: Prod
+            AutoDeploy: true
+
+    # Auth Module Nested Stack
+    AuthModuleResources:
+        Type: AWS::Serverless::Application
+        Properties:
+            Location: ./modules/auth/template.yaml
+            Parameters:
+                TableName: !Ref TableName
+                AllowedOrigin: !Ref AllowedOrigin
+
+    # Wishlist Module Nested Stack
+    WishlistModuleResources:
+        Type: AWS::Serverless::Application
+        Properties:
+            Location: ./modules/wishlist/template.yaml
+            Parameters:
+                TableName: !Ref TableName
+                AllowedOrigin: !Ref AllowedOrigin
+
+    # Products Module Nested Stack
+    ProductsModuleResources:
+        Type: AWS::Serverless::Application
+        Properties:
+            Location: ./modules/products/template.yaml
+            Parameters:
+                TableName: !Ref TableName
+                AllowedOrigin: !Ref AllowedOrigin
+
+    # WebSocket Module Nested Stack
+    WebSocketModuleResources:
+        Type: AWS::Serverless::Application
+        Properties:
+            Location: ./modules/websocket/template.yaml
+            Parameters:
+                TableName: !Ref TableName
+                WebSocketApiId: !Ref WebSocketApi
+                StreamArn: !GetAtt WishlistAppTable.StreamArn
+
+Outputs:
+    WishlistApi:
+        Description: API Gateway ID
+        Value: !Ref WishlistApi
+        Export:
+            Name: WishlistApi
+    WishlistApiEndpoint:
+        Description: URL of the API Gateway
+        Value: !Sub 'https://${WishlistApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/'
+    WebSocketApiEndpoint:
+        Description: URL of the WebSocket API
+        Value: !Sub 'wss://${WebSocketApi}.execute-api.${AWS::Region}.amazonaws.com/Prod'
+    CreateAuthFunctionArn:
+        Description: ARN of the CreateAuth Lambda Function
+        Value: !GetAtt AuthModuleResources.Outputs.CreateAuthFunctionArn
+    CreateWishlistFunctionArn:
+        Description: ARN of the CreateWishlist Lambda Function
+        Value: !GetAtt WishlistModuleResources.Outputs.CreateWishlistFunctionArn
+    GetWishlistsFunctionArn:
+        Description: ARN of the GetWishlists Lambda Function
+        Value: !GetAtt WishlistModuleResources.Outputs.GetWishlistsFunctionArn
+    ManageWishlistFunctionArn:
+        Description: ARN of the ManageWishlist Lambda Function
+        Value: !GetAtt WishlistModuleResources.Outputs.ManageWishlistFunctionArn
+    InviteWishlistFunctionArn:
+        Description: ARN of the InviteWishlist Lambda Function
+        Value: !GetAtt WishlistModuleResources.Outputs.InviteWishlistFunctionArn
+    ManageProductsFunctionArn:
+        Description: ARN of the ManageProducts Lambda Function
+        Value: !GetAtt ProductsModuleResources.Outputs.ManageProductsFunctionArn
+    ConnectFunctionArn:
+        Description: ARN of the WebSocket Connect Lambda Function
+        Value: !GetAtt WebSocketModuleResources.Outputs.ConnectFunctionArn
+    DisconnectFunctionArn:
+        Description: ARN of the WebSocket Disconnect Lambda Function
+        Value: !GetAtt WebSocketModuleResources.Outputs.DisconnectFunctionArn
+    SubscribeFunctionArn:
+        Description: ARN of the WebSocket Subscribe Lambda Function
+        Value: !GetAtt WebSocketModuleResources.Outputs.SubscribeFunctionArn
+    StreamFunctionArn:
+        Description: ARN of the DynamoDB Stream Lambda Function
+        Value: !GetAtt WebSocketModuleResources.Outputs.StreamFunctionArn

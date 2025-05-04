@@ -1,0 +1,993 @@
+openapi: '3.0.3'
+info:
+    title:
+        Fn::Sub: '${AWS::StackName}-backend-apis'
+    description:
+        Fn::Sub: 'Backend APIs for ${AWS::StackName} Collaborative Product Wishlist App'
+    version: '1.0'
+paths:
+    /auth/signup:
+        post:
+            summary: Register a New User
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/SignupRequestBody'
+                required: true
+            responses:
+                '200':
+                    description: User created successfully
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/SignupResponseBody'
+                '400':
+                    description: Bad Request - Invalid or missing fields
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ErrorResponse'
+                '409':
+                    description: Conflict - User already exists
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ErrorResponse'
+                '500':
+                    description: Internal Server Error
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ErrorResponse'
+            x-amazon-apigateway-request-validator: ValidateBody
+            x-amazon-apigateway-integration:
+                type: 'aws_proxy'
+                httpMethod: 'POST'
+                uri:
+                    Fn::Sub: 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AuthModuleResources.Outputs.CreateAuthFunctionArn}/invocations'
+                credentials:
+                    Fn::Sub: '${RestApiRole.Arn}'
+        options:
+            summary: CORS preflight for /auth/signup
+            responses:
+                '200':
+                    description: Successful CORS preflight response
+                    headers:
+                        Access-Control-Allow-Origin:
+                            schema:
+                                type: string
+                        Access-Control-Allow-Methods:
+                            schema:
+                                type: string
+                        Access-Control-Allow-Headers:
+                            schema:
+                                type: string
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties: {}
+            x-amazon-apigateway-integration:
+                type: 'mock'
+                responses:
+                    default:
+                        statusCode: '200'
+                        responseParameters:
+                            method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
+                            method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+                            method.response.header.Access-Control-Allow-Origin: "'*'"
+                requestTemplates:
+                    application/json: '{"statusCode": 200}'
+    /auth/login:
+        post:
+            summary: Authenticate a User
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/LoginRequestBody'
+                required: true
+            responses:
+                '200':
+                    description: Login successful, returns JWT
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/LoginResponseBody'
+                '400':
+                    description: Bad Request - Invalid or missing fields
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ErrorResponse'
+                '401':
+                    description: Unauthorized - Invalid credentials
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ErrorResponse'
+                '500':
+                    description: Internal Server Error
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ErrorResponse'
+            x-amazon-apigateway-request-validator: ValidateBody
+            x-amazon-apigateway-integration:
+                type: 'aws_proxy'
+                httpMethod: 'POST'
+                uri:
+                    Fn::Sub: 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AuthModuleResources.Outputs.CreateAuthFunctionArn}/invocations'
+                credentials:
+                    Fn::Sub: '${RestApiRole.Arn}'
+        options:
+            summary: CORS preflight for /auth/login
+            responses:
+                '200':
+                    description: Successful CORS preflight response
+                    headers:
+                        Access-Control-Allow-Origin:
+                            schema:
+                                type: string
+                        Access-Control-Allow-Methods:
+                            schema:
+                                type: string
+                        Access-Control-Allow-Headers:
+                            schema:
+                                type: string
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties: {}
+            x-amazon-apigateway-integration:
+                type: 'mock'
+                responses:
+                    default:
+                        statusCode: '200'
+                        responseParameters:
+                            method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
+                            method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+                            method.response.header.Access-Control-Allow-Origin: "'*'"
+                requestTemplates:
+                    application/json: '{"statusCode": 200}'
+    /wishlist:
+        post:
+            summary: Create a New Wishlist
+            security:
+                - BearerAuth: []
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/CreateWishlistRequestBody'
+                required: true
+            responses:
+                '201':
+                    description: Wishlist created successfully
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/CreateWishlistResponseBody'
+                '400':
+                    description: Bad Request - Invalid or missing fields
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ErrorResponse'
+                '401':
+                    description: Unauthorized - Missing or invalid JWT
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ErrorResponse'
+                '500':
+                    description: Internal Server Error
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ErrorResponse'
+            x-amazon-apigateway-request-validator: ValidateBody
+            x-amazon-apigateway-integration:
+                type: 'aws_proxy'
+                httpMethod: 'POST'
+                uri:
+                    Fn::Sub: 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${WishlistModuleResources.Outputs.CreateWishlistFunctionArn}/invocations'
+                credentials:
+                    Fn::Sub: '${RestApiRole.Arn}'
+        get:
+            summary: List User Wishlists
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: query
+                  name: limit
+                  schema:
+                      type: integer
+                      minimum: 1
+                      maximum: 100
+                      default: 10
+                  required: false
+                  description: Number of wishlists to return
+            responses:
+                '200':
+                    description: Successful response with list of wishlists
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/GetWishlistsResponseBody'
+                '400':
+                    description: Bad Request - Invalid limit parameter
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ErrorResponse'
+                '401':
+                    description: Unauthorized - Missing or invalid JWT
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ErrorResponse'
+                '500':
+                    description: Internal Server Error
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ErrorResponse'
+            x-amazon-apigateway-integration:
+                type: 'aws_proxy'
+                httpMethod: 'POST'
+                uri:
+                    Fn::Sub: 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${WishlistModuleResources.Outputs.GetWishlistsFunctionArn}/invocations'
+                credentials:
+                    Fn::Sub: '${RestApiRole.Arn}'
+        options:
+            summary: CORS preflight for /wishlist
+            responses:
+                '200':
+                    description: Successful CORS preflight response
+                    headers:
+                        Access-Control-Allow-Origin:
+                            schema:
+                                type: string
+                        Access-Control-Allow-Methods:
+                            schema:
+                                type: string
+                        Access-Control-Allow-Headers:
+                            schema:
+                                type: string
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties: {}
+            x-amazon-apigateway-integration:
+                type: 'mock'
+                responses:
+                    default:
+                        statusCode: '200'
+                        responseParameters:
+                            method.response.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
+                            method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+                            method.response.header.Access-Control-Allow-Origin: "'*'"
+                requestTemplates:
+                    application/json: '{"statusCode": 200}'
+    /wishlist/{wishlistId}:
+        put:
+            summary: Update a Wishlist
+            security:
+                - BearerAuth: []
+            parameters:
+                - name: wishlistId
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                  description: The ID of the wishlist to update
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/UpdateWishlistRequestBody'
+                required: true
+            responses:
+                '200':
+                    description: Wishlist updated successfully
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/UpdateWishlistResponseBody'
+                '400':
+                    description: Bad Request - Invalid or missing fields
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ErrorResponse'
+                '401':
+                    description: Unauthorized - Missing or invalid JWT
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ErrorResponse'
+                '404':
+                    description: Wishlist Not Found or Unauthorized
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ErrorResponse'
+                '500':
+                    description: Internal Server Error
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ErrorResponse'
+            x-amazon-apigateway-request-validator: ValidateBodyAndParams
+            x-amazon-apigateway-integration:
+                type: 'aws_proxy'
+                httpMethod: 'POST'
+                uri:
+                    Fn::Sub: 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${WishlistModuleResources.Outputs.ManageWishlistFunctionArn}/invocations'
+                credentials:
+                    Fn::Sub: '${RestApiRole.Arn}'
+        delete:
+            summary: Delete a Wishlist
+            security:
+                - BearerAuth: []
+            parameters:
+                - name: wishlistId
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                  description: The ID of the wishlist to delete
+            responses:
+                '200':
+                    description: Wishlist deleted successfully
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/DeleteWishlistResponseBody'
+                '400':
+                    description: Bad Request - Missing wishlistId
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ErrorResponse'
+                '401':
+                    description: Unauthorized - Missing or invalid JWT
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ErrorResponse'
+                '404':
+                    description: Wishlist Not Found or Unauthorized
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ErrorResponse'
+                '500':
+                    description: Internal Server Error
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ErrorResponse'
+            x-amazon-apigateway-request-validator: ValidateParams
+            x-amazon-apigateway-integration:
+                type: 'aws_proxy'
+                httpMethod: 'POST'
+                uri:
+                    Fn::Sub: 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-31/functions/${WishlistModuleResources.Outputs.ManageWishlistFunctionArn}/invocations'
+                credentials:
+                    Fn::Sub: '${RestApiRole.Arn}'
+        options:
+            summary: CORS preflight for /wishlist/{wishlistId}
+            responses:
+                '200':
+                    description: Successful CORS preflight response
+                    headers:
+                        Access-Control-Allow-Origin:
+                            schema:
+                                type: string
+                        Access-Control-Allow-Methods:
+                            schema:
+                                type: string
+                        Access-Control-Allow-Headers:
+                            schema:
+                                type: string
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties: {}
+            x-amazon-apigateway-integration:
+                type: 'mock'
+                responses:
+                    default:
+                        statusCode: '200'
+                        responseParameters:
+                            method.response.header.Access-Control-Allow-Methods: "'PUT,DELETE,OPTIONS'"
+                            method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+                            method.response.header.Access-Control-Allow-Origin: "'*'"
+                requestTemplates:
+                    application/json: '{"statusCode": 200}'
+    /wishlist/{wishlistId}/invite:
+        post:
+            summary: Invite a User to a Wishlist
+            security:
+                - BearerAuth: []
+            parameters:
+                - name: wishlistId
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                  description: The ID of the wishlist to invite a user to
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/InviteWishlistRequestBody'
+                required: true
+            responses:
+                '200':
+                    description: User invited successfully
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/InviteWishlistResponseBody'
+                '400':
+                    description: Bad Request - Invalid or missing fields
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ErrorResponse'
+                '401':
+                    description: Unauthorized - Missing or invalid JWT
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ErrorResponse'
+                '404':
+                    description: Wishlist Not Found or Unauthorized
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ErrorResponse'
+                '500':
+                    description: Internal Server Error
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ErrorResponse'
+            x-amazon-apigateway-request-validator: ValidateBodyAndParams
+            x-amazon-apigateway-integration:
+                type: 'aws_proxy'
+                httpMethod: 'POST'
+                uri:
+                    Fn::Sub: 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${WishlistModuleResources.Outputs.InviteWishlistFunctionArn}/invocations'
+                credentials:
+                    Fn::Sub: '${RestApiRole.Arn}'
+        options:
+            summary: CORS preflight for /wishlist/{wishlistId}/invite
+            responses:
+                '200':
+                    description: Successful CORS preflight response
+                    headers:
+                        Access-Control-Allow-Origin:
+                            schema:
+                                type: string
+                        Access-Control-Allow-Methods:
+                            schema:
+                                type: string
+                        Access-Control-Allow-Headers:
+                            schema:
+                                type: string
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties: {}
+            x-amazon-apigateway-integration:
+                type: 'mock'
+                responses:
+                    default:
+                        statusCode: '200'
+                        responseParameters:
+                            method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
+                            method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+                            method.response.header.Access-Control-Allow-Origin: "'*'"
+                requestTemplates:
+                    application/json: '{"statusCode": 200}'
+    /wishlist/{wishlistId}/products:
+        post:
+            summary: Add a Product to a Wishlist
+            security:
+                - BearerAuth: []
+            parameters:
+                - name: wishlistId
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                  description: The ID of the wishlist to add a product to
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/AddProductRequestBody'
+                required: true
+            responses:
+                '201':
+                    description: Product added successfully
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/AddProductResponseBody'
+                '400':
+                    description: Bad Request - Invalid or missing fields
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ErrorResponse'
+                '401':
+                    description: Unauthorized - Missing or invalid JWT
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ErrorResponse'
+                '403':
+                    description: Forbidden - User not authorized for wishlist
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ErrorResponse'
+                '404':
+                    description: Wishlist Not Found
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ErrorResponse'
+                '500':
+                    description: Internal Server Error
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ErrorResponse'
+            x-amazon-apigateway-request-validator: ValidateBodyAndParams
+            x-amazon-apigateway-integration:
+                type: 'aws_proxy'
+                httpMethod: 'POST'
+                uri:
+                    Fn::Sub: 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ProductsModuleResources.Outputs.ManageProductsFunctionArn}/invocations'
+                credentials:
+                    Fn::Sub: '${RestApiRole.Arn}'
+        options:
+            summary: CORS preflight for /wishlist/{wishlistId}/products
+            responses:
+                '200':
+                    description: Successful CORS preflight response
+                    headers:
+                        Access-Control-Allow-Origin:
+                            schema:
+                                type: string
+                        Access-Control-Allow-Methods:
+                            schema:
+                                type: string
+                        Access-Control-Allow-Headers:
+                            schema:
+                                type: string
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties: {}
+            x-amazon-apigateway-integration:
+                type: 'mock'
+                responses:
+                    default:
+                        statusCode: '200'
+                        responseParameters:
+                            method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
+                            method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+                            method.response.header.Access-Control-Allow-Origin: "'*'"
+                requestTemplates:
+                    application/json: '{"statusCode": 200}'
+    /wishlist/{wishlistId}/products/{productId}:
+        put:
+            summary: Update a Product in a Wishlist
+            security:
+                - BearerAuth: []
+            parameters:
+                - name: wishlistId
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                  description: The ID of the wishlist containing the product
+                - name: productId
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                  description: The ID of the product to update
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/UpdateProductRequestBody'
+                required: true
+            responses:
+                '200':
+                    description: Product updated successfully
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/UpdateProductResponseBody'
+                '400':
+                    description: Bad Request - Invalid or missing fields
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ErrorResponse'
+                '401':
+                    description: Unauthorized - Missing or invalid JWT
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ErrorResponse'
+                '403':
+                    description: Forbidden - User not authorized for wishlist
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ErrorResponse'
+                '404':
+                    description: Wishlist or Product Not Found
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ErrorResponse'
+                '500':
+                    description: Internal Server Error
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ErrorResponse'
+            x-amazon-apigateway-request-validator: ValidateBodyAndParams
+            x-amazon-apigateway-integration:
+                type: 'aws_proxy'
+                httpMethod: 'POST'
+                uri:
+                    Fn::Sub: 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ProductsModuleResources.Outputs.ManageProductsFunctionArn}/invocations'
+                credentials:
+                    Fn::Sub: '${RestApiRole.Arn}'
+        delete:
+            summary: Delete a Product from a Wishlist
+            security:
+                - BearerAuth: []
+            parameters:
+                - name: wishlistId
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                  description: The ID of the wishlist containing the product
+                - name: productId
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                  description: The ID of the product to delete
+            responses:
+                '200':
+                    description: Product deleted successfully
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/DeleteProductResponseBody'
+                '400':
+                    description: Bad Request - Missing wishlistId or productId
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ErrorResponse'
+                '401':
+                    description: Unauthorized - Missing or invalid JWT
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ErrorResponse'
+                '403':
+                    description: Forbidden - User not authorized for wishlist
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ErrorResponse'
+                '404':
+                    description: Wishlist or Product Not Found
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ErrorResponse'
+                '500':
+                    description: Internal Server Error
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ErrorResponse'
+            x-amazon-apigateway-request-validator: ValidateParams
+            x-amazon-apigateway-integration:
+                type: 'aws_proxy'
+                httpMethod: 'POST'
+                uri:
+                    Fn::Sub: 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ProductsModuleResources.Outputs.ManageProductsFunctionArn}/invocations'
+                credentials:
+                    Fn::Sub: '${RestApiRole.Arn}'
+        options:
+            summary: CORS preflight for /wishlist/{wishlistId}/products/{productId}
+            responses:
+                '200':
+                    description: Successful CORS preflight response
+                    headers:
+                        Access-Control-Allow-Origin:
+                            schema:
+                                type: string
+                        Access-Control-Allow-Methods:
+                            schema:
+                                type: string
+                        Access-Control-Allow-Headers:
+                            schema:
+                                type: string
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties: {}
+            x-amazon-apigateway-integration:
+                type: 'mock'
+                responses:
+                    default:
+                        statusCode: '200'
+                        responseParameters:
+                            method.response.header.Access-Control-Allow-Methods: "'PUT,DELETE,OPTIONS'"
+                            method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+                            method.response.header.Access-Control-Allow-Origin: "'*'"
+                requestTemplates:
+                    application/json: '{"statusCode": 200}'
+x-amazon-apigateway-request-validators:
+    ValidateBody:
+        validateRequestBody: true
+        validateRequestParameters: false
+    ValidateParams:
+        validateRequestBody: false
+        validateRequestParameters: true
+    ValidateBodyAndParams:
+        validateRequestBody: true
+        validateRequestParameters: true
+components:
+    securitySchemes:
+        BearerAuth:
+            type: http
+            scheme: bearer
+            bearerFormat: JWT
+    schemas:
+        SignupRequestBody:
+            type: object
+            properties:
+                email:
+                    type: string
+                    format: email
+                    example: 'user@example.com'
+                password:
+                    type: string
+                    minLength: 6
+                    example: 'password123'
+            required:
+                - email
+                - password
+        SignupResponseBody:
+            type: object
+            properties:
+                message:
+                    type: string
+                    example: 'User created successfully'
+                email:
+                    type: string
+                    example: 'user@example.com'
+        LoginRequestBody:
+            type: object
+            properties:
+                email:
+                    type: string
+                    format: email
+                    example: 'user@example.com'
+                password:
+                    type: string
+                    minLength: 6
+                    example: 'password123'
+            required:
+                - email
+                - password
+        LoginResponseBody:
+            type: object
+            properties:
+                message:
+                    type: string
+                    example: 'Login successful'
+                token:
+                    type: string
+                    example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
+        CreateWishlistRequestBody:
+            type: object
+            properties:
+                wishlistName:
+                    type: string
+                    minLength: 1
+                    example: 'My Wishlist'
+            required:
+                - wishlistName
+        CreateWishlistResponseBody:
+            type: object
+            properties:
+                message:
+                    type: string
+                    example: 'Wishlist created successfully'
+                wishlistId:
+                    type: string
+                    example: '123e4567-e89b-12d3-a456-426614174000'
+        GetWishlistsResponseBody:
+            type: object
+            properties:
+                wishlists:
+                    type: array
+                    items:
+                        type: object
+                        properties:
+                            PK:
+                                type: string
+                                example: 'WISHLIST#123e4567-e89b-12d3-a456-426614174000'
+                            SK:
+                                type: string
+                                example: 'WISHLIST#123e4567-e89b-12d3-a456-426614174000'
+                            GSI1PK:
+                                type: string
+                                example: 'USER#user@example.com'
+                            GSI1SK:
+                                type: string
+                                example: 'WISHLIST#123e4567-e89b-12d3-a456-426614174000'
+                            wishlistName:
+                                type: string
+                                example: 'My Wishlist'
+                            createdBy:
+                                type: string
+                                example: 'user@example.com'
+                            invitedUsers:
+                                type: array
+                                items:
+                                    type: string
+                                example: ['friend@example.com']
+                            createdAt:
+                                type: string
+                                format: date-time
+                                example: '2025-05-04T12:00:00Z'
+                            updatedAt:
+                                type: string
+                                format: date-time
+                                example: '2025-05-04T12:00:00Z'
+        UpdateWishlistRequestBody:
+            type: object
+            properties:
+                wishlistName:
+                    type: string
+                    minLength: 1
+                    example: 'Updated Wishlist'
+            required:
+                - wishlistName
+        UpdateWishlistResponseBody:
+            type: object
+            properties:
+                message:
+                    type: string
+                    example: 'Wishlist updated successfully'
+                wishlistId:
+                    type: string
+                    example: '123e4567-e89b-12d3-a456-426614174000'
+        DeleteWishlistResponseBody:
+            type: object
+            properties:
+                message:
+                    type: string
+                    example: 'Wishlist deleted successfully'
+                wishlistId:
+                    type: string
+                    example: '123e4567-e89b-12d3-a456-426614174000'
+        InviteWishlistRequestBody:
+            type: object
+            properties:
+                email:
+                    type: string
+                    format: email
+                    example: 'friend@example.com'
+            required:
+                - email
+        InviteWishlistResponseBody:
+            type: object
+            properties:
+                message:
+                    type: string
+                    example: 'User invited successfully'
+                wishlistId:
+                    type: string
+                    example: '123e4567-e89b-12d3-a456-426614174000'
+                invitedEmail:
+                    type: string
+                    example: 'friend@example.com'
+        AddProductRequestBody:
+            type: object
+            properties:
+                productName:
+                    type: string
+                    minLength: 1
+                    example: 'Laptop'
+                imageUrl:
+                    type: string
+                    format: uri
+                    example: 'https://example.com/laptop.jpg'
+                price:
+                    type: number
+                    minimum: 0
+                    example: 999.99
+            required:
+                - productName
+                - imageUrl
+                - price
+        AddProductResponseBody:
+            type: object
+            properties:
+                message:
+                    type: string
+                    example: 'Product added successfully'
+                productId:
+                    type: string
+                    example: '456e7890-f12c-34d5-b678-901234567890'
+        UpdateProductRequestBody:
+            type: object
+            properties:
+                productName:
+                    type: string
+                    minLength: 1
+                    example: 'Updated Laptop'
+                imageUrl:
+                    type: string
+                    format: uri
+                    example: 'https://example.com/updated-laptop.jpg'
+                price:
+                    type: number
+                    minimum: 0
+                    example: 1099.99
+            minProperties: 1
+        UpdateProductResponseBody:
+            type: object
+            properties:
+                message:
+                    type: string
+                    example: 'Product updated successfully'
+                productId:
+                    type: string
+                example: '456e7890-f12c-34d5-b678-901234567890'
+        DeleteProductResponseBody:
+            type: object
+            properties:
+                message:
+                    type: string
+                    example: 'Product deleted successfully'
+                productId:
+                    type: string
+                    example: '456e7890-f12c-34d5-b678-901234567890'
+        ErrorResponse:
+            type: object
+            properties:
+                message:
+                    type: string
+                    example: 'Invalid request'

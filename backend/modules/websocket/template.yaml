@@ -1,0 +1,230 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: WebSocket Module for Collaborative Wishlist App
+
+Parameters:
+    TableName:
+        Type: String
+        Description: Name of the DynamoDB table
+    WebSocketApiId:
+        Type: String
+        Description: ID of the WebSocket API
+    StreamArn:
+        Type: String
+        Description: ARN of the DynamoDB table stream
+
+Globals:
+    Function:
+        Timeout: 10
+        Runtime: nodejs22.x
+        Architectures:
+            - x86_64
+        Environment:
+            Variables:
+                TABLE_NAME: !Ref TableName
+                JWT_SECRET: your-secret-key
+                WEBSOCKET_API_ENDPOINT: !Sub 'wss://${WebSocketApiId}.execute-api.${AWS::Region}.amazonaws.com/Prod/'
+
+Resources:
+    ConnectFunction:
+        Type: AWS::Serverless::Function
+        Properties:
+            Handler: connect/app.handler
+            CodeUri: ../../
+            Policies:
+                - DynamoDBCrudPolicy:
+                      TableName: !Ref TableName
+                - Statement:
+                      - Effect: Allow
+                        Action:
+                            - execute-api:ManageConnections
+                        Resource: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApiId}/*'
+        Metadata:
+            BuildMethod: esbuild
+            BuildProperties:
+                Minify: true
+                Target: es2022
+                Sourcemap: false
+                EntryPoints:
+                    - modules/websocket/connect/app.ts
+                External:
+                    - '@aws-sdk/client-dynamodb'
+                    - '@aws-sdk/lib-dynamodb'
+
+    ConnectIntegration:
+        Type: AWS::ApiGatewayV2::Integration
+        Properties:
+            ApiId: !Ref WebSocketApiId
+            IntegrationType: AWS_PROXY
+            IntegrationUri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ConnectFunction.Arn}/invocations'
+            CredentialsArn: !GetAtt WebSocketApiRole.Arn
+
+    ConnectRoute:
+        Type: AWS::ApiGatewayV2::Route
+        Properties:
+            ApiId: !Ref WebSocketApiId
+            RouteKey: $connect
+            Target: !Join
+                - '/'
+                - - integrations
+                  - !Ref ConnectIntegration
+
+    DisconnectFunction:
+        Type: AWS::Serverless::Function
+        Properties:
+            Handler: disconnect/app.handler
+            CodeUri: ../../
+            Policies:
+                - DynamoDBCrudPolicy:
+                      TableName: !Ref TableName
+        Metadata:
+            BuildMethod: esbuild
+            BuildProperties:
+                Minify: true
+                Target: es2022
+                Sourcemap: false
+                EntryPoints:
+                    - modules/websocket/disconnect/app.ts
+                External:
+                    - '@aws-sdk/client-dynamodb'
+                    - '@aws-sdk/lib-dynamodb'
+
+    DisconnectIntegration:
+        Type: AWS::ApiGatewayV2::Integration
+        Properties:
+            ApiId: !Ref WebSocketApiId
+            IntegrationType: AWS_PROXY
+            IntegrationUri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${DisconnectFunction.Arn}/invocations'
+            CredentialsArn: !GetAtt WebSocketApiRole.Arn
+
+    DisconnectRoute:
+        Type: AWS::ApiGatewayV2::Route
+        Properties:
+            ApiId: !Ref WebSocketApiId
+            RouteKey: $disconnect
+            Target: !Join
+                - '/'
+                - - integrations
+                  - !Ref DisconnectIntegration
+
+    SubscribeFunction:
+        Type: AWS::Serverless::Function
+        Properties:
+            Handler: subscribe/app.handler
+            CodeUri: ../../
+            Policies:
+                - DynamoDBCrudPolicy:
+                      TableName: !Ref TableName
+                - Statement:
+                      - Effect: Allow
+                        Action:
+                            - execute-api:ManageConnections
+                        Resource: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApiId}/*'
+        Metadata:
+            BuildMethod: esbuild
+            BuildProperties:
+                Minify: true
+                Target: es2022
+                Sourcemap: false
+                EntryPoints:
+                    - modules/websocket/subscribe/app.ts
+                External:
+                    - '@aws-sdk/client-dynamodb'
+                    - '@aws-sdk/lib-dynamodb'
+
+    SubscribeIntegration:
+        Type: AWS::ApiGatewayV2::Integration
+        Properties:
+            ApiId: !Ref WebSocketApiId
+            IntegrationType: AWS_PROXY
+            IntegrationUri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${SubscribeFunction.Arn}/invocations'
+            CredentialsArn: !GetAtt WebSocketApiRole.Arn
+
+    SubscribeRoute:
+        Type: AWS::ApiGatewayV2::Route
+        Properties:
+            ApiId: !Ref WebSocketApiId
+            RouteKey: subscribe
+            Target: !Join
+                - '/'
+                - - integrations
+                  - !Ref SubscribeIntegration
+
+    StreamFunction:
+        Type: AWS::Serverless::Function
+        Properties:
+            Handler: stream/app.handler
+            CodeUri: ../../
+            Policies:
+                - DynamoDBCrudPolicy:
+                      TableName: !Ref TableName
+                - Statement:
+                      - Effect: Allow
+                        Action:
+                            - execute-api:ManageConnections
+                        Resource: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApiId}/*'
+            Events:
+                Stream:
+                    Type: DynamoDB
+                    Properties:
+                        Stream: !Ref StreamArn
+                        StartingPosition: LATEST
+                        BatchSize: 100
+        Metadata:
+            BuildMethod: esbuild
+            BuildProperties:
+                Minify: true
+                Target: es2022
+                Sourcemap: false
+                EntryPoints:
+                    - modules/websocket/stream/app.ts
+                External:
+                    - '@aws-sdk/client-dynamodb'
+                    - '@aws-sdk/lib-dynamodb'
+                    - '@aws-sdk/client-apigatewaymanagementapi'
+
+    WebSocketApiRole:
+        Type: AWS::IAM::Role
+        Properties:
+            AssumeRolePolicyDocument:
+                Version: '2012-10-17'
+                Statement:
+                    - Effect: Allow
+                      Principal:
+                          Service: apigateway.amazonaws.com
+                      Action: sts:AssumeRole
+            Policies:
+                - PolicyName: InvokeLambdaPolicy
+                  PolicyDocument:
+                      Version: '2012-10-17'
+                      Statement:
+                          - Effect: Allow
+                            Action:
+                                - lambda:InvokeFunction
+                            Resource:
+                                - !GetAtt ConnectFunction.Arn
+                                - !GetAtt DisconnectFunction.Arn
+                                - !GetAtt SubscribeFunction.Arn
+                                - !GetAtt StreamFunction.Arn
+
+Outputs:
+    ConnectFunctionArn:
+        Description: ARN of the WebSocket Connect Lambda Function
+        Value: !GetAtt ConnectFunction.Arn
+        Export:
+            Name: !Sub '${AWS::StackName}-ConnectFunctionArn'
+    DisconnectFunctionArn:
+        Description: ARN of the WebSocket Disconnect Lambda Function
+        Value: !GetAtt DisconnectFunction.Arn
+        Export:
+            Name: !Sub '${AWS::StackName}-DisconnectFunctionArn'
+    SubscribeFunctionArn:
+        Description: ARN of the WebSocket Subscribe Lambda Function
+        Value: !GetAtt SubscribeFunction.Arn
+        Export:
+            Name: !Sub '${AWS::StackName}-SubscribeFunctionArn'
+    StreamFunctionArn:
+        Description: ARN of the DynamoDB Stream Lambda Function
+        Value: !GetAtt StreamFunction.Arn
+        Export:
+            Name: !Sub '${AWS::StackName}-StreamFunctionArn'
